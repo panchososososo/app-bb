@@ -1,0 +1,74 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    -webkit-tap-highlight-color: transparent;
+    color-scheme: dark;
+  }
+  body {
+    min-height: 100dvh;
+    background:
+      radial-gradient(ellipse 80% 50% at 50% -10%, rgba(176, 38, 255, 0.18), transparent 70%),
+      radial-gradient(ellipse 60% 40% at 100% 100%, rgba(99, 102, 241, 0.12), transparent 70%),
+      #05050a;
+    background-attachment: fixed;
+  }
+  input, textarea, select { font-size: 16px; } /* evita el zoom automático en iOS */
+}
+
+@layer components {
+  .card {
+    @apply rounded-2xl border border-neon-violet/20 bg-void-900/80 p-4 backdrop-blur-md shadow-neon-inset;
+  }
+  .input {
+    @apply w-full rounded-xl border border-neon-violet/30 bg-void-800 px-4 py-3 text-base text-gray-100
+      placeholder:text-gray-500 outline-none transition focus:border-neon-purple focus:shadow-neon-sm;
+  }
+  .btn {
+    @apply inline-flex min-h-[48px] items-center justify-center gap-2 rounded-xl px-5 py-3 text-base font-semibold
+      transition active:scale-[0.97] disabled:opacity-40 disabled:active:scale-100;
+  }
+  .btn-primary {
+    @apply btn bg-gradient-to-r from-neon-purple to-neon-indigo text-white shadow-neon hover:brightness-110;
+  }
+  .btn-ghost {
+    @apply btn border border-neon-violet/40 bg-void-800 text-violet-200 hover:border-neon-purple hover:text-white;
+  }
+  .icon-btn {
+    @apply inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-gray-400 transition
+      hover:bg-void-700 hover:text-pink-300 active:scale-90;
+  }
+  .chip {
+    @apply min-h-[40px] whitespace-nowrap rounded-full border px-4 py-2 text-sm font-medium transition;
+  }
+  .chip-on {
+    @apply border-neon-purple bg-neon-purple/20 text-white shadow-neon-sm;
+  }
+  .chip-off {
+    @apply border-neon-violet/25 bg-void-800 text-gray-400;
+  }
+  .section-title {
+    @apply font-display text-2xl font-extrabold tracking-wider text-white animate-pulse-glow;
+  }
+  .label {
+    @apply mb-1 block text-xs font-semibold uppercase tracking-[0.2em] text-violet-300/80;
+  }
+  .checkbox {
+    @apply h-7 w-7 shrink-0 cursor-pointer appearance-none rounded-lg border-2 border-neon-violet/60 bg-void-800
+      transition checked:border-neon-purple checked:bg-neon-purple checked:shadow-neon-sm;
+    background-image: none;
+  }
+  .checkbox:checked {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='3.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='20 6 9 17 4 12'/%3E%3C/svg%3E");
+    background-size: 70%;
+    background-position: center;
+    background-repeat: no-repeat;
+  }
+}
+
+.no-scrollbar::-webkit-scrollbar { display: none; }
+.no-scrollbar { scrollbar-width: none; }
+.pb-safe { padding-bottom: env(safe-area-inset-bottom); }
+.pt-safe { padding-top: env(safe-area-inset-top); }
