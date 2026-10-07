@@ -65,7 +65,10 @@ export default function Dashboard() {
   const [names, setNames] = useLocalStorage('names', { me: '', her: '' });
   const [notes, setNotes] = useLocalStorage('appreciations', []);
   const [draft, setDraft] = useState('');
-  const [editingDate, setEditingDate] = useState(!anniversary);
+  const [editing, setEditingDate] = useState(false);
+  const [dateDraft, setDateDraft] = useState(anniversary);
+  // La fecha se guarda al pulsar "Guardar"; si llega desde la nube, se muestra el contador directamente.
+  const editingDate = editing || !anniversary;
   const now = useNow();
   const stats = useMemo(() => computeStats(anniversary, now), [anniversary, now]);
 
@@ -141,7 +144,14 @@ export default function Dashboard() {
                 </p>
               </>
             )}
-            <button type="button" className="mt-4 text-xs text-gray-500 underline-offset-4 hover:underline" onClick={() => setEditingDate(true)}>
+            <button
+              type="button"
+              className="mt-4 text-xs text-gray-500 underline-offset-4 hover:underline"
+              onClick={() => {
+                setDateDraft(anniversary);
+                setEditingDate(true);
+              }}
+            >
               Editar fecha y nombres
             </button>
           </div>
@@ -150,7 +160,9 @@ export default function Dashboard() {
             className="relative space-y-3"
             onSubmit={(e) => {
               e.preventDefault();
-              if (anniversary) setEditingDate(false);
+              if (!dateDraft) return;
+              setAnniversary(dateDraft);
+              setEditingDate(false);
             }}
           >
             <div className="flex items-center gap-2 text-violet-200">
@@ -163,9 +175,9 @@ export default function Dashboard() {
             </div>
             <label className="block">
               <span className="label">Fecha del aniversario</span>
-              <input type="date" className="input" value={anniversary} max="2100-12-31" onChange={(e) => setAnniversary(e.target.value)} required />
+              <input type="date" className="input" value={dateDraft} max="2100-12-31" onChange={(e) => setDateDraft(e.target.value)} required />
             </label>
-            <button type="submit" className="btn-primary w-full" disabled={!anniversary}>
+            <button type="submit" className="btn-primary w-full" disabled={!dateDraft}>
               Guardar
             </button>
           </form>

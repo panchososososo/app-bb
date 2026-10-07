@@ -81,3 +81,19 @@ export const CopyIcon = make(
   </>
 );
 export const ChevronIcon = make(<path d="m6 9 6 6 6-6" />);
+export const CloudIcon = make(<path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z" />);
+export const CloudOffIcon = make(
+  <>
+    <path d="m2 2 20 20" />
+    <path d="M5.78 5.78A7 7 0 0 0 9 19h8.5a4.5 4.5 0 0 0 1.31-.2" />
+    <path d="M21.53 16.5A4.5 4.5 0 0 0 17.5 10h-1.79A7 7 0 0 0 10.12 5.11" />
+  </>
+);
+export const RefreshIcon = make(
+  <>
+    <path d="M21 12a9 9 0 0 1-15 6.7L3 16" />
+    <path d="M3 12a9 9 0 0 1 15-6.7L21 8" />
+    <path d="M3 21v-5h5" />
+    <path d="M21 3v5h-5" />
+  </>
+);

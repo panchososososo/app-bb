@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { noteLocalChange } from '../lib/sync.js';
 
 const PREFIX = 'nosotros:';
 
@@ -19,6 +20,7 @@ function read(key, initialValue) {
  * - Lectura síncrona en el primer render (no hay "parpadeo" ni pérdida al recargar).
  * - Escritura inmediata en cada cambio, con soporte para actualizaciones funcionales.
  * - Sincroniza entre pestañas y entre componentes que usen la misma clave.
+ * - Avisa a lib/sync.js para que el cambio se suba a la nube.
  */
 export function useLocalStorage(key, initialValue) {
   const [value, setValue] = useState(() => read(key, initialValue));
@@ -31,6 +33,7 @@ export function useLocalStorage(key, initialValue) {
         try {
           window.localStorage.setItem(PREFIX + key, JSON.stringify(resolved));
           window.dispatchEvent(new CustomEvent('local-storage', { detail: { key } }));
+          noteLocalChange(key);
         } catch (err) {
           console.error(`[useLocalStorage] No se pudo guardar "${key}".`, err);
         }

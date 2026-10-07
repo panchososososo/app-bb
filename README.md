@@ -1,6 +1,15 @@
 # Nosotros · PWA privada de pareja
 
-Vite + React + Tailwind. Sin backend: todo se guarda en `localStorage` (claves con prefijo `nosotros:`).
+Vite + React + Tailwind. Los datos se guardan en el teléfono (`localStorage`, claves con prefijo `nosotros:`) y, al iniciar sesión, se sincronizan con Supabase.
+
+## Nube (Supabase)
+1. En tu proyecto de Supabase (sirve el mismo de Base Lunar): **SQL Editor → New query**, pega [`supabase/esquema.sql`](supabase/esquema.sql) y pulsa **Run**. Crea la tabla `nosotros`, donde cada usuario solo puede ver sus propios datos.
+2. Copia en [`src/config.js`](src/config.js) la **Project URL** y la **Publishable key** (`sb_publishable_…`). Nunca la Secret key.
+3. Entra en la app con tu usuario de Supabase (Authentication → Users). Lo que ya tenías en el teléfono se sube solo la primera vez.
+
+Sin llaves en `config.js`, la app funciona como antes: solo en el teléfono.
+- Funciona sin señal: guarda en el teléfono y sube los cambios cuando vuelve la conexión.
+- Gana la versión más reciente de cada sección; las listas se fusionan la primera vez que entras desde un teléfono nuevo.
 
 ```bash
 npm install
