@@ -4,7 +4,7 @@
  * - Recursos estáticos (JS/CSS/fuentes/iconos): stale-while-revalidate.
  * Sube CACHE_VERSION cuando quieras forzar la limpieza de cachés antiguas.
  */
-const CACHE_VERSION = 'v1';
+const CACHE_VERSION = 'v2';
 const CACHE_NAME = `nosotros-${CACHE_VERSION}`;
 const SCOPE = self.registration.scope;
 
@@ -62,6 +62,12 @@ self.addEventListener('fetch', (event) => {
         })
         .catch(() => caches.match(`${SCOPE}index.html`).then((r) => r || caches.match(SCOPE)))
     );
+    return;
+  }
+
+  // manifest.json: siempre de la red (si no, Chrome vería una versión vieja al instalar).
+  if (url.pathname.endsWith('/manifest.json')) {
+    event.respondWith(fetch(request).catch(() => caches.match(request)));
     return;
   }
 
