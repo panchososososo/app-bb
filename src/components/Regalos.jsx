@@ -1,12 +1,12 @@
 import { useMemo, useState } from 'react';
 import { useLocalStorage, uid } from '../hooks/useLocalStorage.js';
 import { GiftIcon, PlusIcon } from './Icons.jsx';
-import { DeleteButton, EmptyState, Progress, SectionHeader } from './ui.jsx';
+import { DeleteButton, EditActions, EditButton, EmptyState, Progress, SectionHeader } from './ui.jsx';
 
 const eur = (n) =>
   Number(n || 0).toLocaleString('es-ES', { style: 'currency', currency: 'EUR', maximumFractionDigits: 2 });
 
-function GiftRow({ g, onToggle, onRemove }) {
+function GiftRow({ g, onToggle, onRemove, onEdit }) {
   return (
     <li className={`card flex items-center gap-3 py-3 transition ${g.bought ? 'opacity-55' : ''}`}>
       <input type="checkbox" className="checkbox" checked={g.bought} onChange={() => onToggle(g.id)} aria-label={`Marcar ${g.name} como comprado`} />
@@ -21,6 +21,7 @@ function GiftRow({ g, onToggle, onRemove }) {
           )}
         </div>
       </div>
+      <EditButton onClick={() => onEdit(g)} />
       <DeleteButton onClick={() => onRemove(g.id)} />
     </li>
   );
@@ -38,19 +39,39 @@ export default function Regalos() {
     return { pending: p, bought: b, totals: { pending: sum(p), spent: sum(b) } };
   }, [gifts]);
 
-  const add = (e) => {
+  const [editId, setEditId] = useState(null);
+
+  const save = (e) => {
     e.preventDefault();
     const name = form.name.trim();
     if (!name) return;
     const price = form.price === '' ? 0 : Math.max(0, parseFloat(String(form.price).replace(',', '.')) || 0);
     let link = form.link.trim();
     if (link && !/^https?:\/\//i.test(link)) link = `https://${link}`;
-    setGifts((prev) => [{ id: uid(), name, price, link, bought: false, createdAt: Date.now() }, ...prev]);
+    if (editId) {
+      setGifts((prev) => prev.map((g) => (g.id === editId ? { ...g, name, price, link, updatedAt: Date.now() } : g)));
+    } else {
+      setGifts((prev) => [{ id: uid(), name, price, link, bought: false, createdAt: Date.now() }, ...prev]);
+    }
+    cancelEdit();
+  };
+
+  const startEdit = (g) => {
+    setForm({ name: g.name, price: g.price ? String(g.price).replace('.', ',') : '', link: g.link ?? '' });
+    setEditId(g.id);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const cancelEdit = () => {
     setForm({ name: '', price: '', link: '' });
+    setEditId(null);
   };
 
   const toggle = (id) => setGifts((prev) => prev.map((g) => (g.id === id ? { ...g, bought: !g.bought } : g)));
-  const remove = (id) => setGifts((prev) => prev.filter((g) => g.id !== id));
+  const remove = (id) => {
+    setGifts((prev) => prev.filter((g) => g.id !== id));
+    if (editId === id) cancelEdit();
+  };
 
   return (
     <div>
@@ -71,7 +92,8 @@ export default function Regalos() {
 
       {gifts.length > 0 && <Progress done={bought.length} total={gifts.length} label="Comprados" />}
 
-      <form onSubmit={add} className="card mb-5 space-y-3">
+      <form onSubmit={save} className={`card mb-5 space-y-3 ${editId ? 'border-neon-purple/60 shadow-neon' : ''}`}>
+        {editId && <p className="label mb-0">Editando regalo</p>}
         <input className="input" placeholder="¿Qué le gustaría?" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
         <div className="flex gap-2">
           <div className="relative w-36 shrink-0">
@@ -86,9 +108,13 @@ export default function Regalos() {
           </div>
           <input className="input" placeholder="Enlace (opcional)" inputMode="url" value={form.link} onChange={(e) => setForm({ ...form, link: e.target.value })} />
         </div>
-        <button type="submit" className="btn-primary w-full" disabled={!form.name.trim()}>
-          <PlusIcon /> Añadir a la lista
-        </button>
+        {editId ? (
+          <EditActions onCancel={cancelEdit} disabled={!form.name.trim()} />
+        ) : (
+          <button type="submit" className="btn-primary w-full" disabled={!form.name.trim()}>
+            <PlusIcon /> Añadir a la lista
+          </button>
+        )}
       </form>
 
       {gifts.length === 0 ? (
@@ -97,7 +123,7 @@ export default function Regalos() {
         <>
           <ul className="space-y-2">
             {pending.map((g) => (
-              <GiftRow key={g.id} g={g} onToggle={toggle} onRemove={remove} />
+              <GiftRow key={g.id} g={g} onToggle={toggle} onRemove={remove} onEdit={startEdit} />
             ))}
           </ul>
           {bought.length > 0 && (
@@ -109,7 +135,7 @@ export default function Regalos() {
               {showBought && (
                 <ul className="space-y-2">
                   {bought.map((g) => (
-                    <GiftRow key={g.id} g={g} onToggle={toggle} onRemove={remove} />
+                    <GiftRow key={g.id} g={g} onToggle={toggle} onRemove={remove} onEdit={startEdit} />
                   ))}
                 </ul>
               )}

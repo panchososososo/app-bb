@@ -1,9 +1,9 @@
-import { TrashIcon } from './Icons.jsx';
+import { PenIcon, TrashIcon } from './Icons.jsx';
 
 export function SectionHeader({ kicker, title, children }) {
   return (
     <header className="mb-5">
-      <p className="label">{kicker}</p>
+      <p className="label pr-32">{kicker}</p>
       <h1 className="section-title">{title}</h1>
       {children && <p className="mt-2 text-sm leading-relaxed text-gray-400">{children}</p>}
     </header>
@@ -50,6 +50,28 @@ export function Progress({ done, total, label }) {
           style={{ width: `${pct}%` }}
         />
       </div>
+    </div>
+  );
+}
+
+export function EditButton({ onClick, label = 'Editar' }) {
+  return (
+    <button type="button" className="icon-btn" aria-label={label} onClick={onClick}>
+      <PenIcon className="h-5 w-5" />
+    </button>
+  );
+}
+
+/** Botones Cancelar / Guardar para los formularios de edición en línea. */
+export function EditActions({ onCancel, disabled }) {
+  return (
+    <div className="flex gap-2">
+      <button type="button" className="btn-ghost flex-1" onClick={onCancel}>
+        Cancelar
+      </button>
+      <button type="submit" className="btn-primary flex-1" disabled={disabled}>
+        Guardar
+      </button>
     </div>
   );
 }

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useLocalStorage, uid } from '../hooks/useLocalStorage.js';
 import { CalendarIcon, HeartIcon, PlusIcon } from './Icons.jsx';
-import { DeleteButton, EmptyState } from './ui.jsx';
+import { DeleteButton, EditActions, EditButton, EmptyState } from './ui.jsx';
 
 const DAY = 86_400_000;
 
@@ -65,6 +65,7 @@ export default function Dashboard() {
   const [names, setNames] = useLocalStorage('names', { me: '', her: '' });
   const [notes, setNotes] = useLocalStorage('appreciations', []);
   const [draft, setDraft] = useState('');
+  const [editNote, setEditNote] = useState(null); // { id, text }
   const [editing, setEditingDate] = useState(false);
   const [dateDraft, setDateDraft] = useState(anniversary);
   // La fecha se guarda al pulsar "Guardar"; si llega desde la nube, se muestra el contador directamente.
@@ -96,7 +97,7 @@ export default function Dashboard() {
   return (
     <div className="space-y-5">
       <header>
-        <p className="label">Sistema de pareja · online</p>
+        <p className="label pr-32">Sistema de pareja · online</p>
         <h1 className="section-title">{couple}</h1>
       </header>
 
@@ -218,11 +219,36 @@ export default function Dashboard() {
               </p>
               <ul className="space-y-2">
                 {items.map((n) => (
-                  <li key={n.id} className="card flex items-start gap-3 py-3">
-                    <HeartIcon className="mt-0.5 h-5 w-5 shrink-0 text-pink-400 drop-shadow-[0_0_6px_rgba(244,114,182,.8)]" />
-                    <p className="flex-1 break-words text-[15px] leading-relaxed text-gray-200">{n.text}</p>
-                    <DeleteButton onClick={() => setNotes((prev) => prev.filter((x) => x.id !== n.id))} />
-                  </li>
+                  editNote?.id === n.id ? (
+                    <li key={n.id} className="card border-neon-purple/60 shadow-neon">
+                      <form
+                        className="space-y-3"
+                        onSubmit={(e) => {
+                          e.preventDefault();
+                          const text = editNote.text.trim();
+                          if (!text) return;
+                          setNotes((prev) => prev.map((x) => (x.id === n.id ? { ...x, text } : x)));
+                          setEditNote(null);
+                        }}
+                      >
+                        <textarea
+                          className="input min-h-[88px] resize-none"
+                          value={editNote.text}
+                          maxLength={280}
+                          autoFocus
+                          onChange={(e) => setEditNote({ ...editNote, text: e.target.value })}
+                        />
+                        <EditActions onCancel={() => setEditNote(null)} disabled={!editNote.text.trim()} />
+                      </form>
+                    </li>
+                  ) : (
+                    <li key={n.id} className="card flex items-start gap-3 py-3">
+                      <HeartIcon className="mt-0.5 h-5 w-5 shrink-0 text-pink-400 drop-shadow-[0_0_6px_rgba(244,114,182,.8)]" />
+                      <p className="flex-1 break-words text-[15px] leading-relaxed text-gray-200">{n.text}</p>
+                      <EditButton onClick={() => setEditNote({ id: n.id, text: n.text })} />
+                      <DeleteButton onClick={() => setNotes((prev) => prev.filter((x) => x.id !== n.id))} />
+                    </li>
+                  )
                 ))}
               </ul>
             </div>

@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import BottomNav from './components/BottomNav.jsx';
 import Dashboard from './components/Dashboard.jsx';
+import Gustos from './components/Gustos.jsx';
 import Acuerdos from './components/Acuerdos.jsx';
 import Regalos from './components/Regalos.jsx';
 import Citas from './components/Citas.jsx';
@@ -10,6 +11,7 @@ import { useLocalStorage } from './hooks/useLocalStorage.js';
 
 const SECTIONS = {
   inicio: Dashboard,
+  gustos: Gustos,
   acuerdos: Acuerdos,
   regalos: Regalos,
   citas: Citas,

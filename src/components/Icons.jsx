@@ -97,3 +97,6 @@ export const RefreshIcon = make(
     <path d="M21 3v5h-5" />
   </>
 );
+export const StarIcon = make(
+  <path d="M12 2.5l2.9 5.9 6.5.9-4.7 4.6 1.1 6.5L12 17.3l-5.8 3.1 1.1-6.5-4.7-4.6 6.5-.9z" />
+);

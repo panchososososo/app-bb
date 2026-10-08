@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { useLocalStorage, uid } from '../hooks/useLocalStorage.js';
 import { MapPinIcon, PlusIcon, SparkIcon } from './Icons.jsx';
-import { DeleteButton, EmptyState, Progress, SectionHeader } from './ui.jsx';
+import { DeleteButton, EditActions, EditButton, EmptyState, Progress, SectionHeader } from './ui.jsx';
 
 export const CATEGORIES = [
   { id: 'aventura', label: 'Aventura', emoji: '🏔️' },
@@ -26,6 +26,7 @@ export default function Citas() {
   const [cat, setCat] = useState('todas');
   const [status, setStatus] = useState('pendientes');
   const [picked, setPicked] = useState(null);
+  const [editId, setEditId] = useState(null);
 
   const visible = useMemo(
     () =>
@@ -38,12 +39,28 @@ export default function Citas() {
   );
   const doneCount = dates.filter((d) => d.done).length;
 
-  const add = (e) => {
+  const save = (e) => {
     e.preventDefault();
     const title = form.title.trim();
     if (!title) return;
-    setDates((prev) => [{ id: uid(), title, category: form.category, done: false, createdAt: Date.now() }, ...prev]);
+    if (editId) {
+      setDates((prev) => prev.map((d) => (d.id === editId ? { ...d, title, category: form.category, updatedAt: Date.now() } : d)));
+      setEditId(null);
+    } else {
+      setDates((prev) => [{ id: uid(), title, category: form.category, done: false, createdAt: Date.now() }, ...prev]);
+    }
     setForm({ ...form, title: '' });
+  };
+
+  const startEdit = (d) => {
+    setForm({ title: d.title, category: d.category });
+    setEditId(d.id);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const cancelEdit = () => {
+    setForm({ ...form, title: '' });
+    setEditId(null);
   };
 
   const toggle = (id) =>
@@ -63,7 +80,8 @@ export default function Citas() {
 
       {dates.length > 0 && <Progress done={doneCount} total={dates.length} label="Citas vividas" />}
 
-      <form onSubmit={add} className="card mb-4 space-y-3">
+      <form onSubmit={save} className={`card mb-4 space-y-3 ${editId ? 'border-neon-purple/60 shadow-neon' : ''}`}>
+        {editId && <p className="label mb-0">Editando cita</p>}
         <input className="input" placeholder="Nueva idea de cita…" value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} />
         <div className="no-scrollbar -mx-4 flex gap-2 overflow-x-auto px-4">
           {CATEGORIES.map((c) => (
@@ -72,9 +90,13 @@ export default function Citas() {
             </button>
           ))}
         </div>
-        <button type="submit" className="btn-primary w-full" disabled={!form.title.trim()}>
-          <PlusIcon /> Añadir idea
-        </button>
+        {editId ? (
+          <EditActions onCancel={cancelEdit} disabled={!form.title.trim()} />
+        ) : (
+          <button type="submit" className="btn-primary w-full" disabled={!form.title.trim()}>
+            <PlusIcon /> Añadir idea
+          </button>
+        )}
       </form>
 
       <button type="button" className="btn-ghost mb-4 w-full" onClick={surprise}>
@@ -124,7 +146,13 @@ export default function Citas() {
                     {d.done && d.doneAt && ` · ${new Date(d.doneAt).toLocaleDateString('es-ES')}`}
                   </p>
                 </div>
-                <DeleteButton onClick={() => setDates((prev) => prev.filter((x) => x.id !== d.id))} />
+                <EditButton onClick={() => startEdit(d)} />
+                <DeleteButton
+                  onClick={() => {
+                    setDates((prev) => prev.filter((x) => x.id !== d.id));
+                    if (editId === d.id) cancelEdit();
+                  }}
+                />
               </li>
             );
           })}

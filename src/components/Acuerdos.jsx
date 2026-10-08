@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { useLocalStorage, uid } from '../hooks/useLocalStorage.js';
 import { HandshakeIcon, PlusIcon } from './Icons.jsx';
-import { DeleteButton, EmptyState, Progress, SectionHeader } from './ui.jsx';
+import { DeleteButton, EditButton, EmptyState, Progress, SectionHeader } from './ui.jsx';
 
 const TYPES = [
   { id: 'promesa', label: 'Promesa', emoji: '🤞' },
@@ -22,6 +22,7 @@ export default function Acuerdos() {
   const [form, setForm] = useState({ title: '', detail: '', type: 'promesa', who: 'ambos' });
   const [filter, setFilter] = useState('todos');
   const [open, setOpen] = useState(false);
+  const [editId, setEditId] = useState(null);
 
   const visible = useMemo(
     () => items.filter((i) => filter === 'todos' || i.type === filter),
@@ -29,15 +30,29 @@ export default function Acuerdos() {
   );
   const kept = items.filter((i) => i.done).length;
 
-  const add = (e) => {
+  const closeForm = () => {
+    setForm({ title: '', detail: '', type: form.type, who: 'ambos' });
+    setEditId(null);
+    setOpen(false);
+  };
+
+  const save = (e) => {
     e.preventDefault();
     if (!form.title.trim()) return;
-    setItems((prev) => [
-      { id: uid(), ...form, title: form.title.trim(), detail: form.detail.trim(), done: false, createdAt: Date.now() },
-      ...prev,
-    ]);
-    setForm({ title: '', detail: '', type: form.type, who: 'ambos' });
-    setOpen(false);
+    const data = { title: form.title.trim(), detail: form.detail.trim(), type: form.type, who: form.who };
+    if (editId) {
+      setItems((prev) => prev.map((i) => (i.id === editId ? { ...i, ...data, updatedAt: Date.now() } : i)));
+    } else {
+      setItems((prev) => [{ id: uid(), ...data, done: false, createdAt: Date.now() }, ...prev]);
+    }
+    closeForm();
+  };
+
+  const startEdit = (i) => {
+    setForm({ title: i.title, detail: i.detail ?? '', type: i.type, who: i.who });
+    setEditId(i.id);
+    setOpen(true);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const toggle = (id) =>
@@ -52,7 +67,8 @@ export default function Acuerdos() {
       {items.length > 0 && <Progress done={kept} total={items.length} label="Cumplidos / consolidados" />}
 
       {open ? (
-        <form onSubmit={add} className="card mb-5 space-y-3 animate-fade-up">
+        <form onSubmit={save} className={`card mb-5 space-y-3 animate-fade-up ${editId ? 'border-neon-purple/60 shadow-neon' : ''}`}>
+          {editId && <p className="label mb-0">Editando acuerdo</p>}
           <input className="input" placeholder="Ej: Nada de móviles en la cena" value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} autoFocus />
           <textarea className="input min-h-[88px] resize-none" placeholder="Detalles, por qué es importante, cuándo aplica…" value={form.detail} onChange={(e) => setForm({ ...form, detail: e.target.value })} />
           <div>
@@ -76,8 +92,8 @@ export default function Acuerdos() {
             </div>
           </div>
           <div className="flex gap-2">
-            <button type="button" className="btn-ghost flex-1" onClick={() => setOpen(false)}>Cancelar</button>
-            <button type="submit" className="btn-primary flex-1" disabled={!form.title.trim()}>Guardar</button>
+            <button type="button" className="btn-ghost flex-1" onClick={closeForm}>Cancelar</button>
+            <button type="submit" className="btn-primary flex-1" disabled={!form.title.trim()}>{editId ? 'Guardar cambios' : 'Guardar'}</button>
           </div>
         </form>
       ) : (
@@ -112,7 +128,15 @@ export default function Acuerdos() {
                     <span className="rounded-full bg-neon-purple/15 px-2.5 py-1 text-violet-200">{who?.label}</span>
                   </div>
                 </div>
-                <DeleteButton onClick={() => setItems((prev) => prev.filter((x) => x.id !== i.id))} />
+                <div className="flex flex-col">
+                  <EditButton onClick={() => startEdit(i)} />
+                  <DeleteButton
+                    onClick={() => {
+                      setItems((prev) => prev.filter((x) => x.id !== i.id));
+                      if (editId === i.id) closeForm();
+                    }}
+                  />
+                </div>
               </li>
             );
           })}

@@ -19,6 +19,7 @@ export const SYNCED_KEYS = [
   'anniversary',
   'names',
   'appreciations',
+  'likes',
   'agreements',
   'gifts',
   'dates',
