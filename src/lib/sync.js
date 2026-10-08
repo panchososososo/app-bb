@@ -1,19 +1,19 @@
-import { createClient } from '@supabase/supabase-js';
-import { CONFIG } from '../config.js';
-
 /*
- * Sincronización con la nube (Supabase).
+ * Sincronización con la nube vía un Gist secreto de tu cuenta de GitHub
+ * (el mismo sistema que la Bitácora PDT).
  * - LocalStorage sigue siendo la fuente inmediata: la app funciona sin señal.
- * - Cada sección (clave) se sube entera a la tabla `nosotros`.
- * - Gana la versión más reciente de cada sección.
- * - La primera vez que se inicia sesión en un dispositivo, las listas locales y
- *   las de la nube se fusionan por id, así no se pierde nada de lo ya guardado.
+ * - Todo se guarda en un archivo `nosotros.json` dentro del Gist.
+ * - Solo entra quien tenga tu token de GitHub, que se pega una vez en cada
+ *   dispositivo tuyo y nunca sale de él (salvo hacia api.github.com).
+ * - Gana la versión más reciente de cada sección; la primera vez que conectas
+ *   un dispositivo, sus listas se fusionan con las de la nube por id.
  */
 
 const PREFIX = 'nosotros:';
 const META_KEY = `${PREFIX}__sync`;
-const LOCAL_ONLY_KEY = `${PREFIX}__solo-local`;
-const TABLE = 'nosotros';
+const CONF_KEY = `${PREFIX}__github`;
+const GIST_FILE = 'nosotros.json';
+const API = 'https://api.github.com';
 
 export const SYNCED_KEYS = [
   'anniversary',
@@ -25,13 +25,6 @@ export const SYNCED_KEYS = [
   'letters',
   'letter-draft',
 ];
-
-export const supabase =
-  CONFIG.SUPABASE_URL && CONFIG.SUPABASE_KEY
-    ? createClient(CONFIG.SUPABASE_URL, CONFIG.SUPABASE_KEY, {
-        auth: { persistSession: true, autoRefreshToken: true, storageKey: `${PREFIX}auth` },
-      })
-    : null;
 
 // ---------- utilidades de almacenamiento ----------
 function readJSON(fullKey, fallback) {
@@ -51,6 +44,7 @@ function writeJSON(fullKey, value) {
 }
 const readMeta = () => ({ stamps: {}, dirty: [], ...readJSON(META_KEY, {}) });
 const writeMeta = (meta) => writeJSON(META_KEY, meta);
+const readConf = () => readJSON(CONF_KEY, {});
 const hasLocal = (key) => localStorage.getItem(PREFIX + key) !== null;
 
 function applyRemote(key, value) {
@@ -64,15 +58,24 @@ function mergeById(remote, local) {
   return [...remote, ...local.filter((x) => x?.id && !seen.has(x.id))];
 }
 
+/** Acepta el ID del Gist o su URL completa. */
+export function parseGistId(input) {
+  const text = String(input ?? '').trim();
+  const match = text.match(/[0-9a-f]{20,}/i);
+  return match ? match[0] : text;
+}
+
 // ---------- estado observable (para la interfaz) ----------
+const isConfigured = () => {
+  const c = readConf();
+  return !!(c.token && c.gistId);
+};
 let state = {
-  enabled: !!supabase,
-  ready: !supabase,
-  user: null,
-  status: supabase ? 'idle' : 'off', // off | idle | syncing | offline | error
+  configured: isConfigured(),
+  gistId: readConf().gistId ?? null,
+  status: isConfigured() ? 'idle' : 'off', // off | idle | syncing | offline | error
   lastSync: null,
   error: null,
-  localOnly: readJSON(LOCAL_ONLY_KEY, false),
 };
 const listeners = new Set();
 function emit(patch) {
@@ -85,19 +88,76 @@ export const subscribe = (fn) => {
 };
 export const getState = () => state;
 
+// ---------- API de GitHub ----------
+async function gh(path, { token = readConf().token, ...opts } = {}) {
+  const res = await fetch(API + path, {
+    ...opts,
+    cache: 'no-store', // nunca usar una copia vieja del Gist
+    headers: {
+      Authorization: `Bearer ${token}`,
+      Accept: 'application/vnd.github+json',
+      'Content-Type': 'application/json',
+      ...(opts.headers ?? {}),
+    },
+  });
+  if (!res.ok) {
+    const reason =
+      res.status === 401
+        ? 'el token no es válido o expiró'
+        : res.status === 403
+          ? 'el token no tiene permiso de Gists (lectura y escritura)'
+          : res.status === 404
+            ? 'no encuentro ese Gist con este token'
+            : `error ${res.status}`;
+    throw new Error(`GitHub: ${reason}`);
+  }
+  return res.json();
+}
+
+async function pullDoc() {
+  const gist = await gh(`/gists/${readConf().gistId}`);
+  const file = gist.files?.[GIST_FILE];
+  if (!file) return { items: {} };
+  let content = file.content;
+  if (file.truncated && file.raw_url) content = await (await fetch(file.raw_url, { cache: 'no-store' })).text();
+  try {
+    const doc = JSON.parse(content);
+    return { items: doc.items ?? {} };
+  } catch {
+    return { items: {} };
+  }
+}
+
+async function pushDoc(doc) {
+  await gh(`/gists/${readConf().gistId}`, {
+    method: 'PATCH',
+    body: JSON.stringify({ files: { [GIST_FILE]: { content: JSON.stringify({ app: 'nosotros', version: 1, ...doc }, null, 2) } } }),
+  });
+}
+
+function localDoc() {
+  const meta = readMeta();
+  const items = {};
+  const now = Date.now();
+  for (const key of SYNCED_KEYS) {
+    if (hasLocal(key)) items[key] = { valor: readJSON(PREFIX + key, null), actualizado: meta.stamps[key] ?? now };
+  }
+  return { items };
+}
+
 // ---------- cambios locales ----------
 let timer = null;
 export function noteLocalChange(key) {
-  if (!supabase || !SYNCED_KEYS.includes(key)) return;
+  if (!SYNCED_KEYS.includes(key)) return;
   const meta = readMeta();
   meta.stamps[key] = Date.now();
   if (!meta.dirty.includes(key)) meta.dirty.push(key);
   writeMeta(meta);
-  scheduleSync(1200);
+  scheduleSync(1500);
 }
 
 export function scheduleSync(delay = 0) {
-  if (!supabase || !state.user) return;
+  if (!isConfigured()) return;
   clearTimeout(timer);
   timer = setTimeout(syncNow, delay);
 }
@@ -105,7 +165,7 @@ export function scheduleSync(delay = 0) {
 // ---------- sincronización ----------
 let running = null;
 export function syncNow() {
-  if (!supabase || !state.user) return Promise.resolve();
+  if (!isConfigured()) return Promise.resolve();
   if (running) return running;
   running = doSync().finally(() => {
     running = null;
@@ -122,16 +182,13 @@ async function doSync() {
   }
   emit({ status: 'syncing', error: null });
   try {
-    // 1) Bajar lo que hay en la nube (RLS devuelve solo las filas propias).
-    const { data: rows, error } = await supabase.from(TABLE).select('clave, valor, actualizado');
-    if (error) throw error;
-
+    // 1) Bajar lo que hay en la nube.
+    const remoteDoc = await pullDoc();
     const meta = readMeta();
-    const remote = new Map(rows.map((r) => [r.clave, r]));
     const toPush = new Set(meta.dirty);
 
     for (const key of SYNCED_KEYS) {
-      const row = remote.get(key);
+      const row = remoteDoc.items[key];
       const localTs = meta.stamps[key] ?? 0;
 
       if (!row) {
@@ -143,7 +200,7 @@ async function doSync() {
         continue;
       }
 
-      const remoteTs = new Date(row.actualizado).getTime();
+      const remoteTs = Number(row.actualizado) || 0;
 
       // Primera vez en este dispositivo con datos previos: fusionar listas.
       if (!localTs && hasLocal(key)) {
@@ -166,19 +223,18 @@ async function doSync() {
         applyRemote(key, row.valor);
         meta.stamps[key] = remoteTs;
         toPush.delete(key);
+      } else if (localTs > remoteTs) {
+        toPush.add(key);
       }
     }
 
-    // 2) Subir lo pendiente.
+    // 2) Subir lo pendiente (el archivo completo, con lo más nuevo de cada lado).
     if (toPush.size) {
-      const payload = [...toPush].map((key) => ({
-        user_id: state.user.id,
-        clave: key,
-        valor: readJSON(PREFIX + key, null),
-        actualizado: new Date(meta.stamps[key] ?? Date.now()).toISOString(),
-      }));
-      const { error: upErr } = await supabase.from(TABLE).upsert(payload, { onConflict: 'user_id,clave' });
-      if (upErr) throw upErr;
+      const items = { ...remoteDoc.items };
+      for (const key of toPush) {
+        items[key] = { valor: readJSON(PREFIX + key, null), actualizado: meta.stamps[key] ?? Date.now() };
+      }
+      await pushDoc({ items });
     }
 
     // 3) Guardar el estado, sin pisar cambios hechos mientras se sincronizaba.
@@ -196,46 +252,53 @@ async function doSync() {
   }
 }
 
-// ---------- sesión ----------
-export async function initSync() {
-  if (!supabase) return;
-  const { data } = await supabase.auth.getSession();
-  emit({ ready: true, user: data.session?.user ?? null });
-
-  supabase.auth.onAuthStateChange((_event, session) => {
-    const user = session?.user ?? null;
-    if (user?.id !== state.user?.id) {
-      emit({ user });
-      if (user) scheduleSync();
-    }
-  });
-  if (state.user) scheduleSync();
-
+// ---------- conexión ----------
+export function initSync() {
   window.addEventListener('online', () => scheduleSync());
-  window.addEventListener('offline', () => emit({ status: 'offline' }));
+  window.addEventListener('offline', () => isConfigured() && emit({ status: 'offline' }));
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'visible') scheduleSync();
   });
   setInterval(() => document.visibilityState === 'visible' && scheduleSync(), 120_000);
+  scheduleSync();
 }
 
-export async function signIn(email, password) {
-  const { data, error } = await supabase.auth.signInWithPassword({ email: email.trim(), password });
-  if (error) throw error;
-  setLocalOnly(false);
-  emit({ user: data.user });
-  await syncNow();
-}
+/**
+ * Conecta este dispositivo. Sin gistId crea un Gist secreto nuevo con lo que
+ * hay en el teléfono; con gistId se une al existente y fusiona los datos.
+ * Devuelve el ID del Gist (para conectar tus otros dispositivos).
+ */
+export async function connect(tokenInput, gistInput) {
+  const token = String(tokenInput ?? '').trim();
+  if (!token) throw new Error('Falta el token.');
+  let gistId = parseGistId(gistInput);
 
-export async function signOut() {
-  await syncNow().catch(() => {});
-  await supabase.auth.signOut();
-  // La próxima sesión vuelve a fusionar desde cero.
+  if (gistId) {
+    await gh(`/gists/${gistId}`, { token }); // valida token + Gist antes de guardar
+  } else {
+    const created = await gh('/gists', {
+      token,
+      method: 'POST',
+      body: JSON.stringify({
+        description: 'Nosotros — datos de la app (no borrar)',
+        public: false,
+        files: { [GIST_FILE]: { content: JSON.stringify({ app: 'nosotros', version: 1, ...localDoc() }, null, 2) } },
+      }),
+    });
+    gistId = created.id;
+  }
+
+  writeJSON(CONF_KEY, { token, gistId });
+  // Se empieza de cero para que la primera vuelta fusione en vez de pisar.
   writeMeta({ stamps: {}, dirty: [] });
-  emit({ user: null, status: 'idle', lastSync: null });
+  emit({ configured: true, gistId, status: 'idle', error: null });
+  await syncNow();
+  return gistId;
 }
 
-export function setLocalOnly(value) {
-  writeJSON(LOCAL_ONLY_KEY, value);
-  emit({ localOnly: value });
+export function disconnect() {
+  clearTimeout(timer);
+  localStorage.removeItem(CONF_KEY);
+  writeMeta({ stamps: {}, dirty: [] });
+  emit({ configured: false, gistId: null, status: 'off', lastSync: null, error: null });
 }

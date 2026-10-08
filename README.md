@@ -1,15 +1,15 @@
 # Nosotros · PWA privada de pareja
 
-Vite + React + Tailwind. Los datos se guardan en el teléfono (`localStorage`, claves con prefijo `nosotros:`) y, al iniciar sesión, se sincronizan con Supabase.
+Vite + React + Tailwind. Los datos se guardan en el teléfono (`localStorage`, claves con prefijo `nosotros:`) y, si conectas la nube, se sincronizan con un **Gist secreto de tu GitHub**, igual que la Bitácora PDT.
 
-## Nube (Supabase)
-1. En tu proyecto de Supabase (sirve el mismo de Base Lunar): **SQL Editor → New query**, pega [`supabase/esquema.sql`](supabase/esquema.sql) y pulsa **Run**. Crea la tabla `nosotros`, donde cada usuario solo puede ver sus propios datos.
-2. Copia en [`src/config.js`](src/config.js) la **Project URL** y la **Publishable key** (`sb_publishable_…`). Nunca la Secret key.
-3. Entra en la app con tu usuario de Supabase (Authentication → Users). Lo que ya tenías en el teléfono se sube solo la primera vez.
+## Nube (Gist de GitHub)
+1. Crea un token *fine-grained* en https://github.com/settings/personal-access-tokens/new con el permiso **Gists: Read and write** (o reutiliza el de la Bitácora PDT si ya lo tiene).
+2. En la app, toca el botón de nube (arriba a la derecha), pega el token y deja el ID del Gist vacío: se crea un Gist secreto `nosotros.json` con lo que ya tenías.
+3. En tus otros dispositivos pega el mismo token y el ID del Gist que muestra la app.
 
-Sin llaves en `config.js`, la app funciona como antes: solo en el teléfono.
+- Solo acceden los dispositivos donde pegues tu token. El token queda guardado solo en ese dispositivo.
 - Funciona sin señal: guarda en el teléfono y sube los cambios cuando vuelve la conexión.
-- Gana la versión más reciente de cada sección; las listas se fusionan la primera vez que entras desde un teléfono nuevo.
+- Gana la versión más reciente de cada sección; la primera vez que conectas un dispositivo, sus listas se fusionan con las de la nube.
 
 ```bash
 npm install
